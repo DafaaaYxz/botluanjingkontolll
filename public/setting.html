@@ -4,69 +4,187 @@
   <title>Setting AI</title>
 <style>
   body {
-  background: #0f172a;
-  color: white;
-  font-family: sans-serif;
-  padding: 20px;
-}
-
-input, textarea {
-  width: 100%;
-  padding: 10px;
-  background: #020617;
-  color: white;
-  border: 1px solid #334155;
-  margin-bottom: 10px;
-}
-button {
-  padding: 10px;
-  background: #22c55e;
-  border: none;
-  cursor: pointer;
-  color: white;
-}
+    background: #0f172a;
+    color: white;
+    font-family: sans-serif;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 90vh;
+  }
+  .container {
+    background: #1e293b;
+    padding: 30px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+  h2 {
+    text-align: center;
+    color: #cbd5e1;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    margin-bottom: 5px;
+    color: #94a3b8;
+  }
+  input, textarea {
+    width: 100%;
+    padding: 12px;
+    background: #020617;
+    color: white;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    box-sizing: border-box; /* Ensures padding doesn't affect width */
+  }
+  button {
+    padding: 12px 20px;
+    background: #22c55e;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: white;
+    width: 100%;
+    font-size: 16px;
+  }
+  button:hover {
+    background: #16a34a;
+  }
+  .status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    display: none; /* Initially hidden */
+  }
+  .status.success {
+    background: #166534;
+    color: #dcfce7;
+  }
+  .status.error {
+    background: #991b1b;
+    color: #fecaca;
+  }
 </style>
 </head>
 <body>
 
-<h2>Setting AI</h2>
+<div class="container">
+  <h2>Pengaturan AI</h2>
 
-<input id="apikey" placeholder="Masukkan API Key DeepSeek">
-<br><br>
-<textarea id="persona" rows="5" placeholder="Masukkan sifat / persona AI"></textarea>
-<br><br>
+  <label for="apikey">API Key DeepSeek</label>
+  <input id="apikey" placeholder="Masukkan API Key DeepSeek Anda">
 
-<button onclick="save()">Simpan</button>
+  <label for="persona">Persona/Sifat AI</label>
+  <textarea id="persona" rows="5" placeholder="Contoh: Kamu adalah AI yang ramah dan suka membantu."></textarea>
+
+  <button onclick="save()">Simpan Pengaturan</button>
+
+  <div id="status" class="status"></div>
+</div>
 
 <script>
-// Load existing settings on page load
+// Store the original API key to check for changes.
+let originalApiKey = "";
+
+// Load existing settings when the page loads.
 window.onload = async function() {
   try {
     const res = await fetch("/get-setting");
     const data = await res.json();
     
     if (data.apiKey) {
+      originalApiKey = data.apiKey;
       document.getElementById("apikey").value = data.apiKey;
     }
     if (data.persona) {
       document.getElementById("persona").value = data.persona;
     }
   } catch (err) {
-    console.error("Failed to load settings:", err);
+    console.error("Gagal memuat pengaturan:", err);
+    showStatus("Gagal memuat pengaturan.", "error");
   }
 }
 
+// Save the settings.
 async function save() {
-  const apiKey = document.getElementById("apikey").value;
-  const persona = document.getElementById("persona").value;
+  const apiKeyInput = document.getElementById("apikey");
+  const personaInput = document.getElementById("persona");
+  const newApiKey = apiKeyInput.value.trim();
+  const persona = personaInput.value.trim();
 
-  await fetch("/save-setting", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, persona })
-  });
+  let apiKeyToSave = newApiKey;
+  let apiKeyChanged = newApiKey !== originalApiKey && newApiKey !== "";
 
-  alert("Setting tersimpan!");
+  // 1. Validate the new API key if it has changed.
+  if (apiKeyChanged) {
+    showStatus("Memvalidasi API Key...", "progress"); // Feedback for validation
+    try {
+      const validationRes = await fetch("/validate-apikey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: newApiKey })
+      });
+
+      const validationData = await validationRes.json();
+
+      if (!validationRes.ok) {
+        showStatus(`API Key tidak valid: ${validationData.message}`, "error");
+        return; // Stop the save process if validation fails.
+      }
+    } catch (err) {
+      console.error("Error saat validasi:", err);
+      showStatus("Gagal terhubung ke server untuk validasi.", "error");
+      return;
+    }
+  } else {
+    // If the key hasn't changed, we pass the original key to be saved.
+    // This handles the case where the key is masked ('sk-**********...').
+    apiKeyToSave = originalApiKey;
+  }
+
+  // 2. Save the settings (persona and potentially the new API key).
+  try {
+    const saveRes = await fetch("/save-setting", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: apiKeyToSave, persona })
+    });
+
+    const saveData = await saveRes.json();
+    if (saveData.success) {
+      showStatus(saveData.message, "success");
+      // Update the original key to the new one after successful save.
+      if(apiKeyChanged) {
+        originalApiKey = `sk-**********${newApiKey.slice(-4)}`;
+        apiKeyInput.value = originalApiKey;
+      }
+    } else {
+      showStatus("Gagal menyimpan pengaturan.", "error");
+    }
+  } catch (err) {
+    console.error("Error saat menyimpan:", err);
+    showStatus("Gagal terhubung ke server untuk menyimpan.", "error");
+  }
+}
+
+// Helper function to display status messages.
+function showStatus(message, type) {
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = message;
+  statusEl.className = `status ${type}`; // Reset classes and add the new one.
+  statusEl.style.display = "block";
+
+  // Hide the message after a few seconds, unless it's an error.
+  if (type !== "error") {
+    setTimeout(() => {
+      statusEl.style.display = "none";
+    }, 3000);
+  }
 }
 </script>
 
