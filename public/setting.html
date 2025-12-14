@@ -10,26 +10,20 @@
   padding: 20px;
 }
 
-#chat {
-  border: 1px solid #334155;
-  height: 300px;
-  overflow-y: auto;
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
 input, textarea {
   width: 100%;
   padding: 10px;
   background: #020617;
   color: white;
   border: 1px solid #334155;
+  margin-bottom: 10px;
 }
 button {
   padding: 10px;
   background: #22c55e;
   border: none;
   cursor: pointer;
+  color: white;
 }
 </style>
 </head>
@@ -39,12 +33,29 @@ button {
 
 <input id="apikey" placeholder="Masukkan API Key DeepSeek">
 <br><br>
-<textarea id="persona" placeholder="Masukkan sifat / persona AI"></textarea>
+<textarea id="persona" rows="5" placeholder="Masukkan sifat / persona AI"></textarea>
 <br><br>
 
 <button onclick="save()">Simpan</button>
 
 <script>
+// Load existing settings on page load
+window.onload = async function() {
+  try {
+    const res = await fetch("/get-setting");
+    const data = await res.json();
+    
+    if (data.apiKey) {
+      document.getElementById("apikey").value = data.apiKey;
+    }
+    if (data.persona) {
+      document.getElementById("persona").value = data.persona;
+    }
+  } catch (err) {
+    console.error("Failed to load settings:", err);
+  }
+}
+
 async function save() {
   const apiKey = document.getElementById("apikey").value;
   const persona = document.getElementById("persona").value;
