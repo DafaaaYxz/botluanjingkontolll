@@ -26,6 +26,17 @@ function writeDB(data) {
 }
 
 /* =========================
+   GET CURRENT SETTINGS
+========================= */
+app.get("/get-setting", (req, res) => {
+  const db = readDB();
+  res.json({
+    apiKey: db.apiKey || "",
+    persona: db.persona || ""
+  });
+});
+
+/* =========================
    SAVE API KEY & PERSONA
 ========================= */
 app.post("/save-setting", (req, res) => {
